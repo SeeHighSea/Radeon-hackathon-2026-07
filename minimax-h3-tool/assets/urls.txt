@@ -1,0 +1,26 @@
+MiniMax H3 Streamlit UI 访问地址
+=================================
+
+本机访问（推荐，录屏用）:
+  http://localhost:8501/spaces/u-15463-884ab136/8501
+
+内网访问:
+  http://10.244.84.152:8501/spaces/u-15463-884ab136/8501
+
+外网访问（Jupyter 代理）:
+  http://36.150.116.194:8501/spaces/u-15463-884ab136/8501
+
+说明:
+- 直接访问 localhost:8501 会显示 Not Found，必须带 base path。
+- Streamlit 服务进程 PID 记录在 /tmp/opencode/streamlit.pid
+- 服务日志: /tmp/opencode/streamlit.log
+
+启动命令:
+  /opt/venv/bin/python -m streamlit run /workspace/minimax-h3-tool/app/streamlit_app.py \
+    --server.port 8501 --server.address 127.0.0.1 \
+    --server.headless true --browser.gatherUsageStats false
+
+（依赖 ComfyUI 已在 8188 端口运行；后台常驻方式见 /tmp/opencode/daemonize.py）
+
+停止命令:
+  pkill -9 -f "streamlit run"

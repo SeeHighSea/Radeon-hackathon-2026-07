@@ -1,0 +1,139 @@
+# MiniMax H3 · Local Multimodal Video Studio (AMD Radeon / ROCm)
+
+Runs **open-weights MiniMax H3** — an omni-modal text / image → video model
+with **native stereo audio** — 100% locally on a **single AMD Radeon GPU**
+through ComfyUI's native MiniMax H3 nodes, using a **pruned int8** model set
+that fits consumer/workstation GPUs.
+
+![Track 1](https://img.shields.io/badge/AMD%20DevMaster-2026%20Track%201-blue)
+![ROCm](https://img.shields.io/badge/ROCm-7.2.4-orange)
+![ComfyUI](https://img.shields.io/badge/ComfyUI-0.30.0-purple)
+
+## Features
+
+| Mode | Input | Output |
+|------|-------|--------|
+| **T2V** | text prompt | video + stereo audio |
+| **I2V** | prompt + first/last keyframe image(s) | video + stereo audio |
+| **R2V** | prompt + reference images (identity/style lock) | video + stereo audio |
+
+- **Omni-modal**: generates synchronized audio (voice, wind, ambience, music) — no external TTS/ASR needed
+- **AMD-native**: runs on RDNA3 (W7900 / RX 7900 series) via ROCm PyTorch
+- **48 GB VRAM friendly**: pruned int8 weights (~27 GB peak, see [benchmarks](benchmarks/results.md))
+- **Local & private**: no cloud calls; weights stay on your machine
+
+## System requirements
+
+| Item | Minimum | Recommended (tested) |
+|------|---------|----------------------|
+| GPU | AMD Radeon with ROCm (24 GB VRAM) | **AMD Radeon PRO W7900** (48 GB, gfx1100, RDNA3) |
+| Driver stack | ROCm 6.x | **ROCm 7.2.4** |
+| Python | 3.10 | **3.12** |
+| Storage | 80 GB free | 120 GB free (models + ComfyUI) |
+
+## Repository layout
+
+```
+minimax-h3-tool/
+├── app/
+│   ├── comfy_client.py   # ComfyUI API client (builds prompt graphs, polls history)
+│   ├── gradio_app.py     # Web UI (T2V / I2V / R2V tabs, progress bar)
+│   └── bench_t2v.py      # Timed T2V benchmark
+├── workflows/            # Official ComfyUI workflows (importable in UI)
+├── benchmarks/           # Measured performance on W7900
+└── assets/               # Demo / poster material
+```
+
+## Quick start
+
+### 1. Install ComfyUI
+
+```bash
+git clone https://github.com/comfyanonymous/ComfyUI.git /opt/ComfyUI
+/opt/venv/bin/pip install -r /opt/ComfyUI/requirements.txt
+```
+
+### 2. Download the MiniMax H3 model set
+
+The repo uses a **pruned int8** set (training-only params removed, int8 quantized)
+so the full pipeline fits in 48 GB VRAM. Download from the HF mirror:
+
+```bash
+export HF_ENDPOINT=https://hf-mirror.com
+cd /opt/ComfyUI/models
+
+hf download Comfy-Org/MiniMax-H3 \
+  diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors \
+  diffusion_models/minimax_h3_ref2va_pruned_int8_convrot.safetensors \
+  --local-dir diffusion_models
+
+hf download Comfy-Org/MiniMax-H3 \
+  text_encoders/qwen3vl_32b_minimax_h3_int8_convrot.safetensors \
+  --local-dir text_encoders
+
+hf download Comfy-Org/MiniMax-H3 \
+  vae/minimax_h3_video_vae_fp16.safetensors \
+  vae/minimax_h3_audio_vae_fp32.safetensors \
+  --local-dir vae
+```
+
+### 3. Start ComfyUI
+
+```bash
+cd /opt/ComfyUI
+/opt/venv/bin/python main.py --listen 0.0.0.0 --port 8188
+```
+
+### 4. Launch the web app
+
+```bash
+cd /workspace/minimax-h3-tool
+/opt/venv/bin/python app/gradio_app.py --port 7860
+# open http://localhost:7860
+```
+
+### 5. (Optional) verify the full ComfyUI pipeline in the UI
+
+Import any workflow from [`workflows/`](workflows/) into the ComfyUI web UI
+(`http://localhost:8188`) and press Queue.
+
+## Using the CLI client
+
+```python
+from app.comfy_client import generate
+
+# T2V: text -> video + audio
+result = generate(
+    prompt="A red fox running through a snowy forest, cinematic",
+    mode="t2v", width=864, height=480, duration_s=5.0, seed=42,
+)
+
+# I2V: prompt + first/last keyframe
+result = generate(
+    prompt="the character turns to look at the sky",
+    mode="i2v", first_frame=my_img, last_frame=last_img, ...
+)
+
+# R2V: prompt + reference images (use <Picture 1> in prompt)
+result = generate(
+    prompt="Using <Picture 1> as the character reference, ...",
+    mode="r2v", ref_images=[ref1, ref2], ...
+)
+```
+
+## Performance (AMD Radeon PRO W7900 · ROCm 7.2.4)
+
+| Mode | Resolution | Duration | Wall time |
+|------|-----------|----------|-----------|
+| T2V (cold start) | 864x480 | ~5.2 s | 10:42 (incl. model load) |
+| T2V (warm) | 608x352 | ~2.3 s | 75 s |
+| T2V (warm) | 864x480 | ~2.3 s | 170 s |
+
+Details & full model footprint: [`benchmarks/results.md`](benchmarks/results.md)
+
+## License & acknowledgements
+
+- Model: MiniMax H3 — `minimax-h3-community-license-agreement`
+  ([Comfy-Org/MiniMax-H3](https://huggingface.co/Comfy-Org/MiniMax-H3) repackage)
+- Inference: [ComfyUI](https://github.com/comfyanonymous/ComfyUI)
+- Backend: ROCm PyTorch
