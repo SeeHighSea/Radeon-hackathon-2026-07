@@ -101,9 +101,15 @@ The entire inference stack runs on AMD hardware:
 | T2V cold start | 864x480 | ~5.2 s | 10:42 (model load included) |
 | T2V warm | 608x352 | ~2.3 s | 75 s |
 | T2V warm | 864x480 | ~2.3 s | 170 s |
+| **I2V warm** | 864x480 | ~5.2 s | **~10 min** (keyframe-conditioned) |
 
 Peak VRAM ~27 GB (UNet) — comfortably inside 48 GB even with the 27 GB text
 encoder resident.
+
+> **Honest performance disclosure:** image/reference-conditioned modes (I2V/R2V)
+> are the slowest — conditioning tokens ride through every sampling step. A ~5 s
+> I2V clip at 864x480 takes ~9-10 min on this card (553–617 s measured). We
+> report this openly rather than only showing best-case T2V numbers.
 
 ## 6. Innovation Highlights
 

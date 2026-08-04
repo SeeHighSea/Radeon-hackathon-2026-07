@@ -128,6 +128,11 @@ result = generate(
 | T2V (cold start) | 864x480 | ~5.2 s | 10:42 (incl. model load) |
 | T2V (warm) | 608x352 | ~2.3 s | 75 s |
 | T2V (warm) | 864x480 | ~2.3 s | 170 s |
+| **I2V (warm)** | 864x480 | ~5.2 s | **~10 min** (keyframe-conditioned) |
+
+> **Honest disclosure:** image/reference-conditioned modes (I2V/R2V) are slower —
+> conditioning tokens ride every sampling step. A ~5 s I2V clip takes ~9-10 min
+> on the W7900 (553–617 s measured). See [`benchmarks/results.md`](benchmarks/results.md).
 
 Details & full model footprint: [`benchmarks/results.md`](benchmarks/results.md)
 

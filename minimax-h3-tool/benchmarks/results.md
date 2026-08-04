@@ -11,7 +11,13 @@ ROCm 7.2.4 · ComfyUI 0.30.0 · pruned int8 diffusion + int8 Qwen3-VL-32B
 | T2V | 608x352 | 56 | ~2.3s | 75s | warm models |
 | T2V | 864x480 | 56 | ~2.3s | 170s | warm models |
 | T2V | 864x480 | 56 | ~2.3s | 170s | warm models |
+| **I2V** | 864x480 | 124 | ~5.2s | **617s** | keyframe-conditioned, warm models |
+| **I2V** | 864x480 | 124 | ~5.2s | **553s** | keyframe-conditioned, warm models |
 
+> I2V (image-conditioned) is the slowest mode: reference/keyframe tokens ride
+> through every sampling step. Honest disclosure: a ~5 s I2V clip at 864x480
+> takes ~9-10 minutes on this card.
+>
 > First run (cold) also loads ~26 GB UNet + 26 GB text encoder + VAEs from disk.
 > Once loaded, subsequent runs only pay sampling + decode time.
 
