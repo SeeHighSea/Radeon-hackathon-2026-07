@@ -44,6 +44,15 @@ ROCm 7.2.4 · ComfyUI 0.30.0 · pruned int8 diffusion + int8 Qwen3-VL-32B
 # start ComfyUI
 cd /opt/ComfyUI && /opt/venv/bin/python main.py --listen 0.0.0.0 --port 8188
 
+# validate all three modes against the live server (no generation)
+python app/bench.py --all --skip-queue
+
 # run a timed T2V generation
-/opt/venv/bin/python app/bench_t2v.py --width 864 --height 480 --duration 2
+python app/bench.py --mode t2v --width 864 --height 480 --duration 5 --out benchmarks/run.json
+
+# unit tests (no GPU / server needed)
+python app/test_comfy_client.py
 ```
+
+`app/bench.py` also samples the runner's peak RSS (per run) and writes JSON
+results for reproducible reporting.

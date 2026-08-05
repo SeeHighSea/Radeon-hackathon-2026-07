@@ -39,7 +39,9 @@ minimax-h3-tool/
 │   ├── comfy_client.py     # ComfyUI API client (builds prompt graphs, polls history)
 │   ├── streamlit_app.py    # Web UI (T2V / I2V / R2V tabs, progress bar) — primary
 │   ├── gradio_app.py       # Optional Gradio UI
-│   └── bench_t2v.py        # Timed T2V benchmark
+│   ├── bench.py            # Reproducible benchmark (all modes, wall time + peak RAM)
+│   ├── bench_t2v.py        # Quick timed T2V benchmark
+│   └── test_comfy_client.py# Unit tests (no GPU needed)
 ├── workflows/              # Official ComfyUI workflows (importable in UI)
 ├── benchmarks/             # Measured performance on W7900
 ├── assets/
@@ -158,6 +160,25 @@ result = generate(
 > on the W7900 (553–617 s measured). See [`benchmarks/results.md`](benchmarks/results.md).
 
 Details & full model footprint: [`benchmarks/results.md`](benchmarks/results.md)
+
+## Tests & benchmarks
+
+Unit tests (graph construction, frame-length grid, mode wiring — **no GPU needed**):
+
+```bash
+python app/test_comfy_client.py        # 8 tests
+```
+
+Reproducible benchmark (validates against the running ComfyUI, measures
+wall time + process peak RAM; `--skip-queue` validates without generating):
+
+```bash
+# validate all three modes against the live server (no generation)
+python app/bench.py --all --skip-queue
+
+# full timed run
+python app/bench.py --mode t2v --width 864 --height 480 --duration 5 --out benchmarks/run.json
+```
 
 ## License & acknowledgements
 
