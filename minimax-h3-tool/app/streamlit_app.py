@@ -130,7 +130,10 @@ def main():
 
     _sidebar_status()
 
-    tab_t2v, tab_i2v, tab_r2v = st.tabs(["Text → Video (T2V)", "Image → Video (I2V)", "Reference → Video (R2V)"])
+    tab_t2v, tab_i2v, tab_r2v, tab_edit = st.tabs([
+        "Text → Video (T2V)", "Image → Video (I2V)", "Reference → Video (R2V)",
+        "Edit → Video (改图成片)",
+    ])
 
     with tab_t2v:
         st.text_area("Prompt", value=(
@@ -192,6 +195,134 @@ def main():
             _generate_and_serve(
                 st.session_state.r2v_prompt, "r2v", r2v_res, r2v_dur, r2v_seed, imgs[:9]
             )
+
+    with tab_edit:
+        st.markdown(
+            "**改图 → 成片工作站** · ① 局部重绘/改字编辑图片（Qwen-Image）② 编辑结果直接生成视频（I2V）"
+        )
+        st.caption("上传图片 + 遮罩（白色=要修改的区域），用一句话描述修改，例如：把文字改为「53297」")
+        edit_img = st.file_uploader("图片", type=["png", "jpg", "jpeg"], key="edit_img")
+        edit_mask = st.file_uploader("遮罩（白色区域将被修改；不传则整图处理）", type=["png", "jpg", "jpeg"], key="edit_mask")
+        edit_prompt = st.text_area("修改指令", value='把文字改为"53297"', height=80, key="edit_prompt")
+        c1, c2 = st.columns(2)
+        edit_seed = c1.number_input("Seed", value=502211856868836, key="edit_seed")
+        edit_go = c2.button("① 执行编辑", type="primary", key="edit_btn")
+
+        if edit_go:
+            if not edit_img:
+                st.error("请上传图片")
+            else:
+                imgs = _load_uploads([edit_img])
+                img = imgs[0]
+                mask = None
+                if edit_mask:
+                    masks = _load_uploads([edit_mask])
+                    mask = np.array(masks[0][:, :, 0])  # 取红色通道作遮罩
+                from image_editor import edit_image_path
+                try:
+                    result = edit_image_path(img, mask, st.session_state.edit_prompt, seed=int(edit_seed))
+                    if result.get("status") != "success":
+                        st.error(f"编辑失败: {result.get('status')}")
+                    elif result.get("saved_paths"):
+                        st.session_state["edited_path"] = result["saved_paths"][0]
+                        st.image(result["saved_paths"][0], caption="编辑结果")
+                        st.success(f"编辑完成（{result.get('elapsed_s', 0):.0f}s）")
+                    else:
+                        st.warning("未找到输出文件")
+                except Exception as e:
+                    st.error(f"编辑异常: {e}")
+
+        if st.session_state.get("edited_path") and os.path.exists(st.session_state["edited_path"]):
+            st.divider()
+            st.markdown("**② 用编辑后的图片生成视频（I2V）**")
+            e2_prompt = st.text_area("视频提示词", value=(
+                "The camera slowly pushes in on the edited image, gentle motion, ambient sound."
+            ), height=80, key="e2_prompt")
+            ec1, ec2, ec3 = st.columns(3)
+            e2_res = ec1.selectbox("Resolution", list(RESOLUTIONS), key="e2_res")
+            e2_dur = ec2.slider("Duration (s)", 2.0, 15.0, 5.0, 0.5, key="e2_dur")
+            e2_seed = ec3.number_input("Seed", value=556589502035082, key="e2_seed")
+            if st.button("② 生成视频", type="primary", key="e2_btn"):
+                from PIL import Image
+                edited = np.array(Image.open(st.session_state["edited_path"]).convert("RGB"))
+                _generate_and_serve(st.session_state.e2_prompt, "i2v", e2_res, e2_dur, e2_seed, [edited])
+
+    with tab_edit:
+        st.markdown(
+            "**Edit → Video** · 改图成片工作站：先用 Qwen-Image 局部重绘/改字修好一张图，"
+            "再把编辑结果直接喂给 I2V 生成视频+音频。"
+        )
+        e_img = st.file_uploader("1. 原图", type=["png", "jpg", "jpeg"], key="edit_img")
+        e_mask = st.file_uploader(
+            "2. 遮罩（白=要改的区域，可选；留空则整图重绘）",
+            type=["png", "jpg", "jpeg"], key="edit_mask",
+        )
+        e_prompt = st.text_input(
+            "3. 编辑指令（如：改为 53297）", value="改为 53297", key="edit_prompt",
+        )
+        c1, c2 = st.columns(2)
+        e_steps = c1.slider("Steps", 1, 8, 3, key="edit_steps")
+        e_seed = c2.number_input("Seed", value=502211856868836, key="edit_seed")
+
+        edited_path = None
+        if st.button("✏️ 执行编辑", type="primary", key="edit_btn"):
+            if e_img is None:
+                st.error("请上传原图")
+            else:
+                from PIL import Image
+                import io
+                base = np.array(Image.open(io.BytesIO(e_img.getvalue())).convert("RGB"))
+                mask = None
+                if e_mask is not None:
+                    mask = np.array(Image.open(io.BytesIO(e_mask.getvalue())).convert("L"))
+                    mask = (mask > 128).astype(np.uint8) * 255
+                bar = st.progress(0.05, text="Qwen-Image 重绘中…")
+                try:
+                    from image_editor import run_edit
+                    res = run_edit(base, mask, e_prompt, seed=int(e_seed),
+                                   timeout=3600)
+                    if res.get("status") != "success":
+                        st.error(f"编辑失败: {res.get('status')}")
+                    else:
+                        paths = res.get("saved_paths", [])
+                        if paths:
+                            edited_path = paths[0]
+                            bar.progress(1.0, text="done")
+                            st.success("编辑完成")
+                            st.image(edited_path, caption="编辑结果")
+                            st.session_state["edited_path"] = edited_path
+                        else:
+                            st.warning("未找到输出文件")
+                except Exception as ex:
+                    st.error(f"编辑出错: {ex}")
+                finally:
+                    bar.progress(1.0)
+
+        st.markdown("---")
+        st.markdown("**4. 把编辑结果做成视频**")
+        e2_img = st.file_uploader("或用刚编辑好的图（下方自动使用编辑结果）", type=["png", "jpg", "jpeg"], key="edit2_img")
+        e2_prompt = st.text_area("视频提示词", value=(
+            "The camera slowly pushes in while the character turns to look at the sky, "
+            "wind and a low ambient drone in the background."
+        ), height=80, key="edit2_prompt")
+        c1, c2, c3 = st.columns(3)
+        e2_res = c1.selectbox("Resolution", list(RESOLUTIONS), key="edit2_res")
+        e2_dur = c2.slider("Duration (s)", 2.0, 15.0, 5.0, 0.5, key="edit2_dur")
+        e2_seed = c3.number_input("Seed", value=556589502035082, key="edit2_seed")
+        if st.button("🎬 生成视频", type="primary", key="edit2_btn"):
+            imgs = []
+            edited = st.session_state.get("edited_path")
+            if e2_img is not None:
+                imgs = _load_uploads([e2_img])
+            elif edited:
+                from PIL import Image
+                imgs = [np.array(Image.open(edited).convert("RGB"))]
+            if not imgs:
+                st.warning("请上传图片或先执行编辑")
+            else:
+                _generate_and_serve(
+                    st.session_state.edit2_prompt, "i2v", e2_res, e2_dur, e2_seed, imgs[:1]
+                )
 
     st.markdown("---")
     st.caption(

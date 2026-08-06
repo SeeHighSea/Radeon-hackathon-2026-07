@@ -120,6 +120,33 @@ def test_r2v_multiple_refs():
     assert g["30_2"]["class_type"] == "LoadImage"
 
 
+def test_image_editor_graph():
+    from image_editor import build_edit_graph
+    import json
+    img = np.zeros((512, 512, 3), dtype=np.uint8)
+    mask = np.zeros((512, 512), dtype=np.uint8)
+    mask[100:200, 100:200] = 255
+    g = build_edit_graph(img, mask, '改为 "53297"')
+    json.dumps(g)  # no circular reference
+    assert g["5"]["class_type"] == "InpaintCropImproved"
+    assert g["6"]["class_type"] == "TextEncodeQwenImageEditPlus"
+    assert g["12"]["class_type"] == "InpaintStitchImproved"
+    assert g["5"]["inputs"]["device_mode"] == "gpu (much faster)"
+    # checkpoint must be the Qwen edit model
+    assert "Qwen-Rapid-AIO-NSFW-v5" in g["1"]["inputs"]["ckpt_name"]
+
+
+def test_image_editor_mask_conversion():
+    from image_editor import build_edit_graph
+    img = np.zeros((256, 256, 3), dtype=np.uint8)
+    mask = np.zeros((256, 256), dtype=np.uint8)
+    mask[50:80, 50:80] = 255
+    g = build_edit_graph(img, mask, "edit")
+    # ImageToMask node converts IMAGE -> MASK
+    assert g["4"]["class_type"] == "ImageToMask"
+    assert g["5"]["inputs"]["mask"] == ["4", 0]
+
+
 if __name__ == "__main__":
     import traceback
     passed = 0

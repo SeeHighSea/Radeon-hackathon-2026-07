@@ -16,11 +16,13 @@ that fits consumer/workstation GPUs.
 | **T2V** | text prompt | video + stereo audio |
 | **I2V** | prompt + first/last keyframe image(s) | video + stereo audio |
 | **R2V** | prompt + reference images (identity/style lock) | video + stereo audio |
+| **Edit → Video** | image + mask + edit prompt → edited image → I2V | edited still + video + stereo audio |
 
 - **Omni-modal**: generates synchronized audio (voice, wind, ambience, music) — no external TTS/ASR needed
 - **AMD-native**: runs on RDNA3 (W7900 / RX 7900 series) via ROCm PyTorch
 - **48 GB VRAM friendly**: pruned int8 weights (~27 GB peak, see [benchmarks](benchmarks/results.md))
 - **Local & private**: no cloud calls; weights stay on your machine
+- **Edit → Video loop** (new): local Qwen-Image repaint/rewrite (PS-style local inpainting + text rewrite) produces the exact still you want, then I2V turns it into a clip with native audio — a full "edit the image, then make the video" workstation loop
 
 ## System requirements
 
@@ -37,7 +39,8 @@ that fits consumer/workstation GPUs.
 minimax-h3-tool/
 ├── app/
 │   ├── comfy_client.py     # ComfyUI API client (builds prompt graphs, polls history)
-│   ├── streamlit_app.py    # Web UI (T2V / I2V / R2V tabs, progress bar) — primary
+│   ├── image_editor.py     # Qwen-Image local repaint/rewrite (Edit → Video loop)
+│   ├── streamlit_app.py    # Web UI (T2V / I2V / R2V / Edit→Video tabs)
 │   ├── gradio_app.py       # Optional Gradio UI
 │   ├── bench.py            # Reproducible benchmark (all modes, wall time + peak RAM)
 │   ├── bench_t2v.py        # Quick timed T2V benchmark
